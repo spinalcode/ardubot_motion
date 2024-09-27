@@ -28,9 +28,38 @@ int CubeV[12][3] = {
   {4, 3, 8}, {3, 7, 8}, {5, 6, 1}, {6, 2, 1}
 };
 
+const uint8_t ditherMatrix[2][2] = {
+    {0, 128},
+    {192, 64}
+};
+
+
+float lightDir[3] = {0.0, 0.0, -1.0}; // Light coming from the front
+float lightIntensity = 1.0;
+
 float ax = 0, ay = 0, az = 0;
 float scale = 0.5; // Adjust the scale factor
 float cameraDistance = 800; // Distance of the camera from the object
+
+
+void drawDottedHLine(int16_t x, int16_t y, uint8_t length, uint8_t color) {
+  x += (x&1)+(y&1);
+  for (int i = 0; i < length; i += 2) { // Increment by 2 to create the dotted effect
+    arduboy.drawPixel(x + i, y, color);
+  }
+}
+
+void drawDitherLine(int16_t x, int16_t y, uint8_t length, uint8_t color) {
+  for (int i = 0; i < length; i++) { // Increment by 2 to create the dotted effect
+    uint8_t ditherValue = ditherMatrix[y % 2][(x+i) % 2];
+    if (color > ditherValue) {
+      arduboy.drawPixel(x+i, y, WHITE);
+    } else {
+      arduboy.drawPixel(x+i, y, BLACK);
+    }
+
+  }
+}
 
 void setup() {
   arduboy.begin();
@@ -70,7 +99,7 @@ void drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t 
         else if (x1 > b) b = x1;
         if (x2 < a) a = x2;
         else if (x2 > b) b = x2;
-        arduboy.drawFastHLine(a+1, y0, b - a, color);
+        drawDitherLine(a+1, y0, b - a, color);
         return;
     }
 
@@ -88,7 +117,7 @@ void drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t 
         sa += dx01;
         sb += dx02;
         if (a > b) swap(a, b);
-        arduboy.drawFastHLine(a+1, y, b - a, color);
+        drawDitherLine(a+1, y, b - a, color);
     }
 
     sa = dx12 * (y - y1);
@@ -99,7 +128,7 @@ void drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t 
         sa += dx12;
         sb += dx02;
         if (a > b) swap(a, b);
-        arduboy.drawFastHLine(a+1, y, b - a, color);
+        drawDitherLine(a+1, y, b - a, color);
     }
 }
 
@@ -167,13 +196,19 @@ void loop() {
     float vy = transformed[v2][1] - transformed[v0][1];
     float normalZ = ux * vy - uy * vx;
 
+    // Normalize the normal vector
+    float length = sqrt(ux * ux + uy * uy + normalZ * normalZ);
+    ux /= length;
+    uy /= length;
+    normalZ /= length;
+
+    uint8_t color = (11-i) * 20; // dither the faces to look like different colours
     // If the normal vector is facing away from the camera, skip drawing the face
     if (normalZ > 0) {
-      drawFilledTriangle(transformed[v0][0], transformed[v0][1], transformed[v1][0], transformed[v1][1], transformed[v2][0], transformed[v2][1], WHITE);
-
-      arduboy.drawLine(transformed[v0][0], transformed[v0][1], transformed[v1][0], transformed[v1][1], BLACK);
-      arduboy.drawLine(transformed[v1][0], transformed[v1][1], transformed[v2][0], transformed[v2][1], BLACK);
-      arduboy.drawLine(transformed[v2][0], transformed[v2][1], transformed[v0][0], transformed[v0][1], BLACK);
+        drawFilledTriangle(transformed[v0][0], transformed[v0][1], transformed[v1][0], transformed[v1][1], transformed[v2][0], transformed[v2][1], color);
+        arduboy.drawLine(transformed[v0][0], transformed[v0][1], transformed[v1][0], transformed[v1][1], BLACK);
+        arduboy.drawLine(transformed[v1][0], transformed[v1][1], transformed[v2][0], transformed[v2][1], BLACK);
+        arduboy.drawLine(transformed[v2][0], transformed[v2][1], transformed[v0][0], transformed[v0][1], BLACK);
     }
   }
 
